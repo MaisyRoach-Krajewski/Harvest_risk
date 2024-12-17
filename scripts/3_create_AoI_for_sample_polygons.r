@@ -8,12 +8,13 @@ library(raster)
 library(terra)
 library(exactextractr)
 
-setwd("C:/")
+setwd("C:/harvest_risk")
 
-source("Quebec_Ecoforestry/functions.R") #This loads packages and runs functions
+# Load helper functions ===========================================================================
+source("scripts/helper_functions.R") 
 
 ## Load in a list of all FMU shapefiles with their path ===========================================
-fmu_list <- list.files(path = 'Quebec_Ecoforestry/Inventory-4-shapefile/', 
+fmu_list <- list.files(path = 'data/raw/ecoforestry_4e_shapefiles/', 
                        pattern = '\\.shp$', 
                        full.names = TRUE)
 #to only include the 'PEE' layers that we are interested in
@@ -26,15 +27,15 @@ fmu_list <- Filter(function(x) !any(grepl("_NC.", x)), fmu_list)
 all_polygons <- do.call(rbind, sapply(fmu_list, st_read, simplify = FALSE))
 gc() #clear out unused memory 
 
-##Load in sample polygons from Step 2 ============================================================
-sample_polys <- st_read('QC_harvest_risk/Processed_data/sample_polygons_with_vars.shp')
+##Load in sample polygons from Step 2 =============================================================
+sample_polys <- st_read('data/processed/sample_polygons_with_vars.shp')
 
 ## Create directory to store the AoI files for each sample polygon ================================
-dir.create(file.path('QC_harvest_risk/Processed_data/AoI_by_sample_poly', showWarnings = FALSE))
+dir.create(file.path('data/processed/AoI_by_sample_poly'))
 
 ## Loop through sample polygons, extract and save AoI subsets =====================================
 unique_FMUs <- unique(sample_polys$ID)
-for (i in 34:length(unique_FMUs)){
+for (i in 1:length(unique_FMUs)){
   
   current_fmu_code <- unique_FMUs[i]
   
@@ -55,7 +56,7 @@ for (i in 34:length(unique_FMUs)){
   
   #Save AoI data to new directory folder 
   st_write(AoI_data, 
-           print(paste0("QC_harvest_risk/Processed_data/AoI_by_sample_poly/AoI_", current_fmu_code,".shp")))
+           print(paste0("data/processed/AoI_by_sample_poly/AoI_", current_fmu_code,".shp")))
   
   rm(AoI_data)
   gc()
