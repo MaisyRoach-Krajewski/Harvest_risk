@@ -3,12 +3,12 @@ library(sf)
 library(readxl)
 library(stringr)
 
-setwd("C:/")
+setwd("C:/harvest_risk")
 
-source("Quebec_Ecoforestry/functions.R") #This loads packages and runs functions
+source("scripts/helper_functions.R") #This loads packages and runs functions
 
 # Get the codes that correspond with each FMU ============================================================
-fmu_codes <- st_read('Quebec_Ecoforestry/ecoforestry coverage file/Pee_maj.shp')
+fmu_codes <- st_read('data/raw/ecoforestry_tile_coverage/Pee_maj.shp')
 fmu_codes <- paste(fmu_codes$feuillet, collapse = "|")
 
 
@@ -16,9 +16,9 @@ fmu_codes <- paste(fmu_codes$feuillet, collapse = "|")
 sample.set <- sample_polygons(10, # number of harvested polygons you want
                               10, #number of non-harvested polygons you want
                               fmu_codes,
-                              shapefile_path = 'Quebec_Ecoforestry/Inventory-4-shapefile/')
+                              shapefile_path = 'data/raw/ecoforestry_4e_shapefiles/')
 
 #Save dataset into processed data folder =================================================================
-st_write(sample.set, 'QC_harvest_risk/Processed_data/sample_polygons.shp', overwrite = T)
+st_write(sample.set, 'data/processed/sample_polygons.shp', overwrite = T)
 
 rm(list = ls())

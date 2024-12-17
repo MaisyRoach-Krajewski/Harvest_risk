@@ -9,8 +9,8 @@ sample_polygons <- function(n_harvested,
                             shapefile_path) {
   
   # Load auxiliary data needed for sampling 
-  ORI <- read_excel('QC_harvest_risk/uniqueORI_categories.xlsx')
-  exclude <- read_excel('QC_harvest_risk/eliminated_polygons.xlsx')
+  ORI <- read_excel('data/raw/ecoforestry_auxiliary_data/uniqueORI_categories.xlsx')
+  exclude <- read_excel('data/raw/ecoforestry_auxiliary_data/eliminated_polygons.xlsx')
   
   cut_codes <- ORI %>% filter(Cut == 'X') %>% pull(`Origine code`)
   exclude_codes <- exclude %>% filter(Eliminate == 'X') %>% pull(Code)
