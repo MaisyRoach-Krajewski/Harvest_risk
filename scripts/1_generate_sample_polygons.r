@@ -5,7 +5,8 @@ library(stringr)
 
 setwd("C:/harvest_risk")
 
-source("scripts/helper_functions.R") #This loads packages and runs functions
+# Load helper functions ==================================================================================
+source("scripts/helper_functions.R") 
 
 # Get the codes that correspond with each FMU ============================================================
 fmu_codes <- st_read('data/raw/ecoforestry_tile_coverage/Pee_maj.shp')

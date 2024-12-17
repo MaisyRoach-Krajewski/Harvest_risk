@@ -8,31 +8,57 @@ library(raster)
 library(terra)
 library(exactextractr)
 
-setwd("C:/")
+setwd("C:/harvest_risk")
 
-source("Quebec_Ecoforestry/functions.R") #This loads packages and runs functions
+# Load helper functions ==================================================================================
+source("scripts/helper_functions.R") 
 
-## Load auxiliary data for queries ===============================================================
-ORI <- read_excel('QC_harvest_risk/uniqueORI_categories.xlsx')
-exclude <- read_excel('QC_harvest_risk/eliminated_polygons.xlsx')
-age <- read_excel('QC_harvest_risk/age.xlsx')
-species <- read_excel('QC_harvest_risk/Species_codes.xlsx')
+## Load auxiliary data for queries =======================================================================
+ORI <- read_excel('data/raw/ecoforestry_auxiliary_data/uniqueORI_categories.xlsx')
+exclude <- read_excel('data/raw/ecoforestry_auxiliary_data/eliminated_polygons.xlsx')
+age <- read_excel('data/raw/ecoforestry_auxiliary_data/age.xlsx')
+species <- read_excel('data/raw/ecoforestry_auxiliary_data/Species_codes.xlsx')
 
-#Read in raster layers (all should have matching CRS, res, and alignment)
-# **see 'C:/QC_harvest_risk/harvest_raster_prep.R' for details**
-dist <- rast(raster("QC_harvest_risk/Data/NRCan_rasters/NRCan_250_combined.tif", band = 1))
-mill <- rast(raster("QC_harvest_risk/Data/NRCan_rasters/NRCan_250_combined.tif", band = 2))
-mean_gmv <- rast(raster("QC_harvest_risk/Data/NRCan_rasters/NRCan_250_combined.tif", band = 3))
-elevation<-rast("QC_harvest_risk/Data/elevation/elevation_redefined.tif")
-slope<-rast("QC_harvest_risk/Data/slope/slope_redefined.tif")
-
+#Prepare codes
 cut_codes <- ORI %>% filter(Cut == 'X') %>% pull(`Origine code`)
 exclude_codes <- exclude %>% filter(Eliminate == 'X') %>% pull(Code)
 
-SUP_data <- read.csv("QC_harvest_risk/SUP_data_combined.csv")
+#Read in raster layers (all should have matching CRS, res, and alignment)
+# **see 'C:/harvest_risk/scripts/harvest_raster_prep.R' for details**
+dist <- rast(raster("data/raw/rasters/NRCan_250_combined.tif", band = 1))
+mill <- rast(raster("data/raw/rasters/NRCan_250_combined.tif", band = 2))
+mean_gmv <- rast(raster("data/raw/rasters/NRCan_250_combined.tif", band = 3))
+elevation<-rast("data/raw/rasters/elevation_redefined.tif")
+slope<-rast("data/raw/rasters/slope_redefined.tif")
+
+## Manage standalone data ================================================================================
+# NOTE: only do this once to create the 'SUP_data_combined.csv', then you can skip these steps
+data_list <- list.files(path = 'data/raw/ecoforestry_4e_shapefiles/', pattern = '\\.dbf$', full.names = TRUE)
+data_list <- Filter(function(x) grepl("ETAGE_ORI", x), data_list) #to only include the 'ETAGE' layers
+all_extra_data <- do.call(rbind, sapply(data_list, read.dbf, simplify = FALSE))
+
+#Filter to only include density and hieight values for dominant stands
+SUP_data <- all_extra_data %>% filter(ETAGE == 'SUP')
+SUP_data <- dplyr::select(SUP_data, c("GEOCODE", "DENSITE", "HAUTEUR"))
+
+### ISSUE WITH DUPLICATE ENTRIES IN SUP DATA ###
+# Check for duplicate GEOCODEs in SUP_data
+# duplicates <- SUP_data %>%
+#   group_by(GEOCODE) %>%
+#   filter(n() > 1)
+# there are a lot of duplicates, and the data in the height/age/density columns are the same (the whole row is duplicated),
+#so I'm removing the duplicates below: (keeping the first occurrence)
+SUP_data <- SUP_data %>%
+  distinct(GEOCODE, .keep_all = TRUE)
+
+SUP_data <- as.data.frame(SUP_data)
+write.csv(SUP_data, "data/processed/SUP_data_combined.csv")
+
+# NOTE: once SUP_data file is saved once, access it here: 
+SUP_data <- read.csv("data/processed/SUP_data_combined.csv")
 
 ##Load in sample polygons from Step 1 ===========================================================
-sample_polys <- st_read('QC_harvest_risk/Processed_data/sample_polygons.shp')
+sample_polys <- st_read('data/processed/sample_polygons.shp')
 
 ##Attach additional data to sample polygons =====================================================
 sample_polys <- sample_polys %>%
@@ -145,6 +171,6 @@ sample_polys$mean_elev <- exact_extract(elevation, sample_polys, 'mean')
 sample_polys$max_slope <- exact_extract(slope, sample_polys, 'max')
 
 ## Save dataset in processed data folder ==========================================================
-st_write(sample_polys, 'QC_harvest_risk/Processed_data/sample_polygons_with_vars.shp', overwrite = T)
+st_write(sample_polys, 'data/processed/sample_polygons_with_vars.shp', overwrite = T)
 
 rm(list = ls())
