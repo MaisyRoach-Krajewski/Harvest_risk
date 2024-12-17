@@ -81,7 +81,7 @@ for (j in 1:length(unique_FMUs)){
   AoI_water <- AoI_data %>% 
     filter(CO_TER == 'EAU'| TYPE_TE == 'EAU')
   
-  #Use custom filter to calculate proportion of water in each buffered sample polygon ------------------------------------
+  #Use custom filter to calculate proportion of water in each buffered sample polygon 
   sample_polys_filtered$water <- parallel_calculate_in_buffer(sample_polys_filtered, 
                                                               AoI_water, 
                                                               buffer_dist = 7000)
@@ -100,7 +100,7 @@ for (j in 1:length(unique_FMUs)){
   #           Why?  1. Creates irregular 'clusters' of area that better represent how industry considers ecoforestry poplygons 
   #                 2. Faster to run when avoiding st_intersection() - no longer clipping any polygons
   
-  # Calculate proportion of harvested polygons in cluster ------------------------------------------------------------------
+  # Calculate proportion of harvested polygons in cluster 
   AoI_harvest <- AoI_cluster_data %>% 
     filter(harvest == 1)              # This is our target layer. 
   
@@ -113,7 +113,7 @@ for (j in 1:length(unique_FMUs)){
   rm(AoI_harvest)
   gc()
   
-  # Calculate proportion of forest type in buffer --------------------------------------------------------------------------
+  # Calculate proportion of forest type in buffer
   
   AoI_coniferous <- AoI_cluster_data %>% 
     filter(TYPE_CO == 'R')
@@ -139,8 +139,8 @@ for (j in 1:length(unique_FMUs)){
   rm(AoI_coniferous, AoI_deciduous, AoI_mixed)
   gc()
   
-  # Extract average GMV, forest age, height and density in cluster around each sample polygon -----------------------------------------
-  
+  # Extract average GMV, forest age, height and density in cluster around each sample polygon
+                
   #Extract mean GMV values from raster
   AoI_cluster_data$mean_gmv <- exact_extract(mean_gmv, AoI_cluster_data, 'mean')
   
@@ -153,7 +153,7 @@ for (j in 1:length(unique_FMUs)){
   rm(AoI_cluster_data)
   gc()
   
-  #Save file for FMU -------------------------------------------------------------------------------------------------------------
+  #Save file for FMU 
   
   sample_dataset <- st_drop_geometry(sample_polys_filtered)
   
