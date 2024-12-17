@@ -308,7 +308,7 @@ parallel_calculate_in_buffer <- function(data,
   target_layer <- target_layer %>%  ##NOTE: this was added in to correct the issue I was having with 
     st_union %>%                    ##      water area being greater that the buffer area, thus giving a >1 proportion. 
     st_as_sf()                      ##      Could have been caused by overlapping water polygons, but I'm not sure. 
-  ##      All I know is this fixed it.
+                                    ##      All I know is this fixed it.
   
   # Ensure geometries are valid
   data <- st_make_valid(data)
