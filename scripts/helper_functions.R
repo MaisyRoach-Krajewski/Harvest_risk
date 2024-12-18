@@ -5,7 +5,7 @@
 
 sample_polygons <- function(n_harvested, 
                             n_nonharvested, 
-                            fmu_codes, 
+                            tile_codes, 
                             shapefile_path) {
   
   # Load auxiliary data needed for sampling 
@@ -16,19 +16,19 @@ sample_polygons <- function(n_harvested,
   exclude_codes <- exclude %>% filter(Eliminate == 'X') %>% pull(Code)
   
   # Get list of relevant shapefiles
-  fmu_list <- list.files(path = shapefile_path, pattern = '\\.shp$', full.names = TRUE)
-  fmu_list <- fmu_list[grepl("PEE", fmu_list) & grepl(fmu_codes, fmu_list) & !grepl("_C", fmu_list)]
+  file_list <- list.files(path = shapefile_path, pattern = '\\.shp$', full.names = TRUE)
+  file_list <- file_list[grepl("PEE", file_list) & grepl(tile_codes, file_list) & !grepl("_C", file_list)]
   
   # Initialize final sample set
   sample.set <- as.data.frame(NULL)
   
   # Loop through each shapefile
-  for (i in seq_along(fmu_list)) {
+  for (i in seq_along(file_list)) {
     
     # Read shapefile
-    data <- st_read(fmu_list[i])
-    code <- str_sub(fmu_list[i], -7, -5)
-    data$ID <- rep(code, nrow(data))
+    data <- st_read(file_list[i])
+    code <- str_sub(file_list[i], -7, -5)
+    data$tile_ID <- rep(code, nrow(data))
     
     # Filter polygons based on exclude codes
     incl <- data %>% filter(!CO_TER %in% exclude_codes | !TYPE_TE %in% exclude_codes)
@@ -46,13 +46,13 @@ sample_polygons <- function(n_harvested,
     n_nonharv <- min(n_nonharvested, nrow(non_harv))
     nonharv_sample <- non_harv[sample(nrow(non_harv), n_nonharv), ]
     
-    # Combine samples for this FMU
-    fmu_sample <- rbind(harv_sample, nonharv_sample)
+    # Combine samples for this tile
+    tile_sample <- rbind(harv_sample, nonharv_sample)
     
     # Add to final sample set
-    sample.set <- rbind(sample.set, fmu_sample)
+    sample.set <- rbind(sample.set, tile_sample)
     
-    message(paste0("FMU ", code, " added to sample set (", i, "/", length(fmu_list), ")"))
+    message(paste0("Tile # ", code, " added to sample set (", i, "/", length(file_list), ")"))
   }
   
   return(sample.set)
@@ -87,7 +87,7 @@ assign_height <- function(data) {
   # Define the mapping of old values to new values
   height_map <- c(
     "-" = "0.75",
-    "1" = "28.25", #Check at some point what the max height is across FMUs (for now its 35 so 21.5-35)
+    "1" = "28.25", #Check at some point what the max height is across tiles (for now its 35 so 21.5-35)
     "2" = "19",
     "3" = "14",
     "4" = "9",
@@ -253,7 +253,7 @@ species_count <- function(data,
 
 # PART 3: CREATE AOI POLYGON SUBSETS -------------------------------------------
 
-get_FMU_AoI <- function(data, 
+get_tile_AoI <- function(data, 
                         buffer_dist, 
                         all_polygons){
   
