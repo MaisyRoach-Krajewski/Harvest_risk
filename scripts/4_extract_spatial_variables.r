@@ -159,7 +159,7 @@ for (j in 1:length(unique_FMUs)){
   
   #Subset only useful columns
   final_sample <- dplyr::select(sample_dataset, c("GEOCODE",
-                                                  "ID",
+                                                  "tile_ID",
                                                   "TYPE_CO", 
                                                   "harvest", 
                                                   "dns_cmb", 
