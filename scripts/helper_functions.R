@@ -1,7 +1,124 @@
 # CUSTOM FUNCTIONS FOR HARVEST RISK VARIABLE EXTRACTION ========================
 # Finalized 12-12-2024 
 
+## 00. Saving data by UA -------------------------------------------------------
+
+# Parallel processing of UA polygons
+
+process_UA <- function(UA_row, all_polygons, output_dir) {
+  
+  UA_ID <- UA_row$NO_UG_RESP
+  
+  # Find intersecting polygons
+  intersecting_indices <- st_intersects(all_polygons, UA_row, sparse = FALSE)
+  intersecting_polygons <- all_polygons[intersecting_indices, ]
+  
+  rm(all_polygons)
+  gc() 
+  
+  # Validate and fix geometries
+  intersecting_polygons <- st_make_valid(intersecting_polygons)
+  
+  # Calculate intersection areas
+  intersected <- st_intersection(intersecting_polygons, UA_row) %>%
+    mutate(intersection_area = st_area(.))  # Area of intersection
+  
+  # Add original areas from all_polygons
+  intersected <- intersected %>%
+    mutate(original_area = st_area(intersecting_polygons)) %>%
+    mutate(overlap_ratio = as.numeric(intersection_area / original_area))
+  
+  # Identify polygons meeting the >51% overlap criterion
+  selected_indices <- which(intersected$overlap_ratio >= 0.51)
+  
+  # Subset the original (unchanged) polygons
+  filtered <- intersecting_polygons[selected_indices, ] %>%
+    mutate(UA_ID = UA_ID)  # Add the UA_ID column
+  
+  # Validate geometries before saving
+  filtered <- st_make_valid(filtered)
+  
+  # Save the filtered data as a shapefile
+  output_path <- file.path(output_dir, paste0(UA_ID, ".shp"))
+  
+  tryCatch({
+    st_write(filtered, output_path, delete_dsn = TRUE)
+  }, error = function(e) {
+    message(paste("Error writing shapefile for UA_ID:", UA_ID, "- Skipping problematic feature."))
+  })
+}
+
+
 ## PART 1: GENERATE SAMPLE POLYGONS  -------------------------------------------
+
+sample_by_AU <- function(backtrack_yrs, 
+                         n_harvested,
+                         n_nonharvested,
+                         shapefile_path) {
+  
+  # Load auxiliary data needed for sampling 
+  ORI <- read_excel('data/raw/ecoforestry_auxiliary_data/uniqueORI_categories.xlsx')
+  exclude <- read_excel('data/raw/ecoforestry_auxiliary_data/eliminated_polygons.xlsx')
+  
+  cut_codes <- ORI %>% filter(Cut == 'X') %>% pull(`Origine code`)
+  exclude_codes <- exclude %>% filter(Eliminate == 'X') %>% pull(Code)
+  
+  # Get list of shapefiles from path 
+  file_list <- list.files(path = shapefile_path, pattern = '\\.shp$', full.names = TRUE)
+  
+  # Initialize final sample set
+  sample.set <- as.data.frame(NULL)
+  
+  # Loop through each shapefile
+  for (i in seq_along(file_list)) {
+    
+    # Read shapefile
+    data <- st_read(file_list[i])
+    UA = data$UA_ID[1]
+    
+    # Filter polygons based on exclude codes
+    incl <- data %>% 
+            filter(!CO_TER %in% exclude_codes | !TYPE_TE %in% exclude_codes)
+            
+    
+    # # Assign harvested or non-harvested based on cut codes
+    # incl <- incl %>% mutate(harvest = if_else(ORIGINE %in% cut_codes, 1, 0))
+    
+    # Extract maximum year of harvest activity in this UA 
+    max_year = as.numeric(max(incl$AN_ORIG, na.rm = TRUE))
+    
+    recent = c(seq((max_year - (backtrack_yrs - 1)), max_year))
+      
+    incl <- incl %>%
+      mutate(
+        harvest = ifelse(ORIGINE %in% cut_codes & AN_ORIG %in% recent, 1, 0))
+    
+    # Generate random sample of harvested polygons 
+    harv_poly <- incl[incl$harvest == 1, ] #subset harvested polygons 
+    n_harvest <- min(n_harvested, nrow(harv_poly)) #Set number of sampled rows
+    harv_sample <- harv_poly[sample(nrow(harv_poly), n_harvest), ]
+    
+    # Generate random sample of non-harvested polygons 
+    non_harv <- incl %>% 
+                filter(harvest == 0) %>% 
+                filter(TYPE_CO %in% c("M", "F", "R")) # Only interested in forested polygons 
+    # non_harv <- incl[incl$harvest == 0, ]
+    
+    n_nonharv <- min(n_nonharvested, nrow(non_harv))
+    nonharv_sample <- non_harv[sample(nrow(non_harv), n_nonharv), ]
+    
+    # Combine samples for this UA
+    UA_sample <- rbind(harv_sample, nonharv_sample)
+    
+    # Add to final sample set
+    sample.set <- rbind(sample.set, UA_sample)
+    
+    message(paste0("UA # ", UA, " added to sample set (", i, "/", length(file_list), ")"))
+  }
+  
+  return(sample.set)
+}
+
 
 sample_polygons <- function(n_harvested, 
                             n_nonharvested, 
@@ -103,12 +220,39 @@ assign_height <- function(data) {
 }
 
 
-get_harvested_polygons <- function(data, 
-                                   ORI) {
+# get_harvested_polygons <- function(data, 
+#                                    ORI) {
+#   cut_codes <- ORI %>% filter(Cut == 'X') %>% pull(`Origine code`)
+#   data %>%
+#     mutate(harvest = ifelse(ORIGINE %in% cut_codes, 1, 0))
+# }
+
+recent_harvest <- function(data, 
+                           ORI,
+                           version) {
+  
+  if (version == 2) {
+    end_year = 1994
+  } else if (version == 3) {
+    end_year = 2003
+  } else if (version == 4) {
+    end_year = 2015
+  } else if (version == 5) {
+    end_year = 2023
+  } else {
+    print("Invalid version.")
+  }
+  
   cut_codes <- ORI %>% filter(Cut == 'X') %>% pull(`Origine code`)
+  yrs5 <- c(seq((end_year - 4), end_year))
+  yrs10 <- c(seq((end_year - 9), end_year))
+  
   data %>%
-    mutate(harvest = ifelse(ORIGINE %in% cut_codes, 1, 0))
+    mutate(
+      harv_5 = ifelse(ORIGINE %in% cut_codes & AN_ORIG %in% yrs5, 1, 0),
+      harv_10 = ifelse(ORIGINE %in% cut_codes & AN_ORIG %in% yrs10, 1, 0))
 }
+
 
 assign_age <- function(data, 
                        age) {
@@ -281,7 +425,7 @@ parallel_calculate_in_buffer <- function(data,
   
   # Set up a parallel plan (e.g., using all available cores)
   options(future.globals.maxSize = 4 * 1024^3)
-  plan(multisession, workers = parallel::detectCores())
+  plan(multisession, workers = parallel::detectCores()-1)
   
   # Ensure that 'data' and 'target_layer' are 'sf' objects
   if (!inherits(data, "sf")) {
@@ -366,7 +510,7 @@ para_calculate_in_cluster <- function(data,
   
   # Set up a parallel plan
   options(future.globals.maxSize = 4 * 1024^3)
-  plan(multisession, workers = parallel::detectCores())
+  plan(multisession, workers = parallel::detectCores()-1)
   
   # Ensure 'data' and 'target_layer' are 'sf' objects
   if (!inherits(data, "sf")) stop("'data' must be an 'sf' object.")
@@ -430,7 +574,7 @@ para_ave_in_cluster <- function(data,
   
   # Set up a parallel plan
   options(future.globals.maxSize = 4 * 1024^3)
-  plan(multisession, workers = parallel::detectCores())
+  plan(multisession, workers = parallel::detectCores()-1)
   
   # Ensure 'data' and 'target_layer' are 'sf' objects
   if (!inherits(data, "sf")) stop("'data' must be an 'sf' object.")
